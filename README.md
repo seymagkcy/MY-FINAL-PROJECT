@@ -14,5 +14,7 @@ The predictions and some needed adaptations such as the number of epocs and the 
 My prediction algorithm conists two basic steps:
   FIRST: I closed the data of the most 2 current days and I predicted the daily close/last transaction price of vthe the day before the most current day. And I evaluated the prediction performance using evaluation function of the layer structure of the ANN.
   SECOND: I closed the data only of the most current day and I predicted the daily close/last transaction price of that day and I evaluated the prediction performance using evaluation function of the layer structure of the ANN like I did at the first step.
+
+ 
   
    
