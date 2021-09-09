@@ -1,0 +1,101 @@
+# import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+# from sklearn.model_selection import cross_val_score
+# from sklearn.model_selection import KFold
+# from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import MinMaxScaler
+from tensorflow.python.keras.models import Sequential
+from tensorflow.python.keras.layers import Dense
+# from tensorflow.python.keras.wrappers.scikit_learn import KerasRegressor
+
+
+df_from_csv_MSFT = pd.read_csv('MSFT_1YEAR_till120221.csv',sep='\s*,\s*',engine='python')
+def mydatetimeconverter(stringdate):
+    datetime_from_string = stringdate.replace(',','')
+    return pd.to_datetime(datetime_from_string)
+
+def mymonetaryconverter(monetary):
+    new_monetary = monetary.replace(',','').replace('$','')
+    return float(new_monetary)
+
+# def mymonetaryconverter_for_Low(monetary_Low):
+#    new_monetary_Low = monetary_Low.replace(',','').replace('$','').replace(';','')
+#    return float(new_monetary_Low)
+
+# We do the required conversions for "Date","Close/Last","Open","High" and "Low;;;;;" columns.
+df_from_csv_MSFT["Date"] = df_from_csv_MSFT["Date"].apply(mydatetimeconverter)
+df_from_csv_MSFT["Volume"] = df_from_csv_MSFT["Volume"].astype('float')
+df_from_csv_MSFT["Close/Last"] = df_from_csv_MSFT["Close/Last"].apply(mymonetaryconverter)
+df_from_csv_MSFT["Open"] = df_from_csv_MSFT["Open"].apply(mymonetaryconverter)
+df_from_csv_MSFT["High"] = df_from_csv_MSFT["High"].apply(mymonetaryconverter)
+df_from_csv_MSFT["Low"] = df_from_csv_MSFT["Low"].apply(mymonetaryconverter)
+# df_from_csv_MSFT["Low;;;;;"] = df_from_csv_MSFT["Low;;;;;"].apply(mymonetaryconverter_for_Low)
+
+# Then we create a new DataFrame which contains "Date","Close/Last","Open","High" and "Low;;;;;" columns converted and we call it "converted_dataframe".
+converted_dataframe_MSFT = pd.DataFrame(df_from_csv_MSFT[["Date","Close/Last","Volume","Open","High","Low"]])
+# We create one more DataFrame other than "converted_dataframe" getting all the columns except "Date" column and call it "converted_dataframe_for_model"
+# Because "Date" column won't be appropriate to use in the neural network model as it doesn't have a numerical data format like float, integer etc.
+# So we will use the below "converted_dataframe_for_model" in our neural network model.
+converted_dataframe_for_model_MSFT = pd.DataFrame(converted_dataframe_MSFT[["Close/Last","Volume","Open","High","Low"]])
+# print(converted_dataframe_for_model_MSFT)
+
+converted_dataframe_for_model_MSFT = converted_dataframe_for_model_MSFT.drop(labels=[0,1])
+
+array_from_converted_dataframe_for_model_MSFT = converted_dataframe_for_model_MSFT.to_numpy()
+X_MSFT = array_from_converted_dataframe_for_model_MSFT[:,1:]
+y_MSFT = array_from_converted_dataframe_for_model_MSFT[:,0]
+
+y_MSFT = np.reshape(y_MSFT,(-1,1))
+scaler_X_MSFT = MinMaxScaler()
+scaler_y_MSFT = MinMaxScaler()
+
+print(scaler_X_MSFT.fit(X_MSFT))
+XSCALE_MSFT = scaler_X_MSFT.transform(X_MSFT)
+print(scaler_y_MSFT.fit(y_MSFT))
+ySCALE_MSFT = scaler_y_MSFT.transform(y_MSFT)
+
+train_XSCALE_MSFT,test_XSCALE_MSFT,train_ySCALE_MSFT,test_ySCALE_MSFT = train_test_split(XSCALE_MSFT,ySCALE_MSFT,test_size=0.20,train_size=0.80)
+
+
+artificialneuralnetwork_sym_MSFT = Sequential()
+artificialneuralnetwork_sym_MSFT.add(Dense(4,input_shape=(251,4),activation='relu'))
+artificialneuralnetwork_sym_MSFT.add(Dense(4,activation='relu'))
+artificialneuralnetwork_sym_MSFT.add(Dense(1,activation='linear'))
+
+artificialneuralnetwork_sym_MSFT.compile(loss='mse',optimizer='rmsprop',metrics=['mse'])
+
+artificialneuralnetwork_sym_MSFT.fit(train_XSCALE_MSFT,train_ySCALE_MSFT,epochs=222,batch_size=1)
+
+loss,meansquarederror = artificialneuralnetwork_sym_MSFT.evaluate(test_XSCALE_MSFT,test_ySCALE_MSFT)
+print("Kayıp Fonksiyonu değeri(loss) ve Ortalama Kare Hata metriği(meansquarederror) değeri :\n", loss,meansquarederror)
+
+
+# WHEN OUR XtoPredict CONSISTS OF ONLY ONE SAMPLE:
+XtoPredict_MSFT = np.array([[15751060,244.78,245.15,242.15]])
+
+for i in XtoPredict_MSFT[0]:
+    if i == 0:
+       XtoPredict_MSFT[0,i] = XtoPredict_MSFT[0,i].astype('float')
+    break
+print(XtoPredict_MSFT)
+
+
+"""
+# WHEN OUR XtoPredict CONSISTS OF MORE THAN ONE SAMPLES:
+XtoPredict_MSFT = np.array([[15751060,244.78,245.15,242.15],[16561080,243.933,245.3,242.73]])
+
+for i in XtoPredict_MSFT[:]:
+    for j in i:
+       while j == 0:
+            XtoPredict_MSFT[i,j] = XtoPredict_MSFT[i,j].astype('float')
+
+#print(XtoPredict_MSFT)
+"""
+
+XtoPredict_MSFT = scaler_X_MSFT.transform(XtoPredict_MSFT)
+y_Predicted_MSFT = artificialneuralnetwork_sym_MSFT.predict(XtoPredict_MSFT)
+y_Predicted_MSFT = scaler_y_MSFT.inverse_transform(y_Predicted_MSFT)
+XtoPredict_MSFT = scaler_X_MSFT.inverse_transform(XtoPredict_MSFT)
+print("XtoPredict_MSFT= %s,y_Predicted_MSFT=%s" % (XtoPredict_MSFT[0],y_Predicted_MSFT[0]))
