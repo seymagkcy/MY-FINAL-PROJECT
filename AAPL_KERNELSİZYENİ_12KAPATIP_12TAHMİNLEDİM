@@ -1,0 +1,96 @@
+# import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+# from sklearn.model_selection import cross_val_score
+# from sklearn.model_selection import KFold
+# from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import MinMaxScaler
+from tensorflow.python.keras.models import Sequential
+from tensorflow.python.keras.layers import Dense
+# from tensorflow.python.keras.wrappers.scikit_learn import KerasRegressor
+
+df_from_csv_AAPL = pd.read_csv('AAPL_1YEAR_tilll120221.csv',sep='\s*,\s*',engine='python')
+def mydatetimeconverter(stringdate):
+    datetime_from_string = stringdate.replace(',','')
+    return pd.to_datetime(datetime_from_string)
+
+def mymonetaryconverter(monetary):
+    new_monetary = monetary.replace(',','').replace('$','')
+    return float(new_monetary)
+
+# def mymonetaryconverter_for_Low(monetary_Low):
+#    new_monetary_Low = monetary_Low.replace(',','').replace('$','').replace(';','')
+#    return float(new_monetary_Low)
+
+# We do the required conversions for "Date","Close/Last","Open","High" and "Low;;;;;" columns.
+df_from_csv_AAPL["Date"] = df_from_csv_AAPL["Date"].apply(mydatetimeconverter)
+df_from_csv_AAPL["Volume"] = df_from_csv_AAPL["Volume"].astype('float')
+df_from_csv_AAPL["Close/Last"] = df_from_csv_AAPL["Close/Last"].apply(mymonetaryconverter)
+df_from_csv_AAPL["Open"] = df_from_csv_AAPL["Open"].apply(mymonetaryconverter)
+df_from_csv_AAPL["High"] = df_from_csv_AAPL["High"].apply(mymonetaryconverter)
+df_from_csv_AAPL["Low"] = df_from_csv_AAPL["Low"].apply(mymonetaryconverter)
+# df_from_csv_AAPL["Low;;;;;"] = df_from_csv_AAPL["Low;;;;;"].apply(mymonetaryconverter_for_Low)
+
+# Then we create a new DataFrame which contains "Date","Close/Last","Open","High" and "Low;;;;;" columns converted and we call it "converted_dataframe".
+converted_dataframe_AAPL = pd.DataFrame(df_from_csv_AAPL[["Date","Close/Last","Volume","Open","High","Low"]])
+# We create one more DataFrame other than "converted_dataframe" getting all the columns except "Date" column and call it "converted_dataframe_for_model"
+# Because "Date" column won't be appropriate to use in the neural network model as it doesn't have a numerical data format like float, integer etc.
+# So we will use the below "converted_dataframe_for_model" in our neural network model.
+converted_dataframe_for_model_AAPL = pd.DataFrame(converted_dataframe_AAPL[["Close/Last","Volume","Open","High","Low"]])
+
+
+converted_dataframe_for_model_AAPL = converted_dataframe_for_model_AAPL.drop(labels=[0])
+
+array_from_converted_dataframe_for_model_AAPL = converted_dataframe_for_model_AAPL.to_numpy()
+X_AAPL = array_from_converted_dataframe_for_model_AAPL[:,1:]
+y_AAPL = array_from_converted_dataframe_for_model_AAPL[:,0]
+
+y_AAPL = np.reshape(y_AAPL,(-1,1))
+scaler_X_AAPL = MinMaxScaler()
+scaler_y_AAPL = MinMaxScaler()
+
+print(scaler_X_AAPL.fit(X_AAPL))
+XSCALE_AAPL = scaler_X_AAPL.transform(X_AAPL)
+print(scaler_y_AAPL.fit(y_AAPL))
+ySCALE_AAPL = scaler_y_AAPL.transform(y_AAPL)
+
+train_XSCALE_AAPL,test_XSCALE_AAPL,train_ySCALE_AAPL,test_ySCALE_AAPL = train_test_split(XSCALE_AAPL,ySCALE_AAPL,test_size=0.20,train_size=0.80)
+
+artificialneuralnetwork_sym_AAPL = Sequential()
+artificialneuralnetwork_sym_AAPL.add(Dense(4,input_shape=(252,4),activation='relu'))
+artificialneuralnetwork_sym_AAPL.add(Dense(4,activation='relu'))
+artificialneuralnetwork_sym_AAPL.add(Dense(1,activation='linear'))
+
+artificialneuralnetwork_sym_AAPL.compile(loss='mse',optimizer='rmsprop',metrics=['mse'])
+artificialneuralnetwork_sym_AAPL.fit(train_XSCALE_AAPL,train_ySCALE_AAPL,epochs=236,batch_size=1)
+
+loss,meansquarederror = artificialneuralnetwork_sym_AAPL.evaluate(test_XSCALE_AAPL,test_ySCALE_AAPL)
+print("Kayıp Fonksiyonu değeri(loss) ve Ortalama Kare Hata metriği(meansquarederror) değeri :\n", loss,meansquarederror)
+
+
+# WHEN OUR XtoPredict CONSISTS OF ONLY ONE SAMPLE:
+XtoPredict_AAPL = np.array([[60145130,134.35,135.53,133.6921]])
+
+for i in XtoPredict_AAPL[0]:
+    if i == 0:
+       XtoPredict_AAPL[0,i] = XtoPredict_AAPL[0,i].astype('float')
+    break
+print(XtoPredict_AAPL)
+
+"""
+# WHEN OUR XtoPredict CONSISTS OF MORE THAN ONE SAMPLES:
+XtoPredict_AAPL = np.array([[64280030,135.9,136.39,133.77],[60145130,134.35,135.53,133.6921]])
+for i in XtoPredict_AAPL[:]:
+    for j in i:
+       while j == 0:
+            XtoPredict_AAPL[i,j] = XtoPredict_AAPL[i,j].astype('float')
+
+#print(XtoPredict_AAPL)
+"""
+
+XtoPredict_AAPL = scaler_X_AAPL.transform(XtoPredict_AAPL)
+y_Predicted_AAPL = artificialneuralnetwork_sym_AAPL.predict(XtoPredict_AAPL)
+y_Predicted_AAPL = scaler_y_AAPL.inverse_transform(y_Predicted_AAPL)
+XtoPredict_AAPL = scaler_X_AAPL.inverse_transform(XtoPredict_AAPL)
+print("XtoPredict_AAPL= %s,y_Predicted_AAPL=%s" % (XtoPredict_AAPL[0],y_Predicted_AAPL[0]))
