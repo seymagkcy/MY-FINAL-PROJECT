@@ -1,0 +1,98 @@
+# import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split
+# from sklearn.model_selection import cross_val_score
+# from sklearn.model_selection import KFold
+# from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import MinMaxScaler
+from tensorflow.python.keras.models import Sequential
+from tensorflow.python.keras.layers import Dense
+# from tensorflow.python.keras.wrappers.scikit_learn import KerasRegressor
+
+df_from_csv_GOOGL = pd.read_csv('GOOGL_1YEAR_till120221.csv',sep='\s*,\s*',engine='python')
+def mydatetimeconverter(stringdate):
+    datetime_from_string = stringdate.replace(',','')
+    return pd.to_datetime(datetime_from_string)
+
+def mymonetaryconverter(monetary):
+    new_monetary = monetary.replace(',','').replace('$','')
+    return float(new_monetary)
+
+# def mymonetaryconverter_for_Low(monetary_Low):
+#    new_monetary_Low = monetary_Low.replace(',','').replace('$','').replace(';','')
+#    return float(new_monetary_Low)
+
+# We do the required conversions for "Date","Close/Last","Open","High" and "Low;;;;;" columns.
+df_from_csv_GOOGL["Date"] = df_from_csv_GOOGL["Date"].apply(mydatetimeconverter)
+df_from_csv_GOOGL["Volume"] = df_from_csv_GOOGL["Volume"].astype('float')
+df_from_csv_GOOGL["Close/Last"] = df_from_csv_GOOGL["Close/Last"].apply(mymonetaryconverter)
+df_from_csv_GOOGL["Open"] = df_from_csv_GOOGL["Open"].apply(mymonetaryconverter)
+df_from_csv_GOOGL["High"] = df_from_csv_GOOGL["High"].apply(mymonetaryconverter)
+df_from_csv_GOOGL["Low"] = df_from_csv_GOOGL["Low"].apply(mymonetaryconverter)
+# df_from_csv_GOOGL["Low;;;;;"] = df_from_csv_GOOGL["Low;;;;;"].apply(mymonetaryconverter_for_Low)
+
+# Then we create a new DataFrame which contains "Date","Close/Last","Open","High" and "Low;;;;;" columns converted and we call it "converted_dataframe".
+converted_dataframe_GOOGL = pd.DataFrame(df_from_csv_GOOGL[["Date","Close/Last","Volume","Open","High","Low"]])
+# We create one more DataFrame other than "converted_dataframe" getting all the columns except "Date" column and call it "converted_dataframe_for_model"
+# Because "Date" column won't be appropriate to use in the neural network model as it doesn't have a numerical data format like float, integer etc.
+# So we will use the below "converted_dataframe_for_model" in our neural network model.
+converted_dataframe_for_model_GOOGL = pd.DataFrame(converted_dataframe_GOOGL[["Close/Last","Volume","Open","High","Low"]])
+
+
+converted_dataframe_for_model_GOOGL = converted_dataframe_for_model_GOOGL.drop(labels=[0,1])
+
+array_from_converted_dataframe_for_model_GOOGL = converted_dataframe_for_model_GOOGL.to_numpy()
+X_GOOGL = array_from_converted_dataframe_for_model_GOOGL[:,1:]
+y_GOOGL = array_from_converted_dataframe_for_model_GOOGL[:,0]
+
+y_GOOGL = np.reshape(y_GOOGL,(-1,1))
+scaler_X_GOOGL = MinMaxScaler()
+scaler_y_GOOGL = MinMaxScaler()
+
+print(scaler_X_GOOGL.fit(X_GOOGL))
+XSCALE_GOOGL = scaler_X_GOOGL.transform(X_GOOGL)
+print(scaler_y_GOOGL.fit(y_GOOGL))
+ySCALE_GOOGL = scaler_y_GOOGL.transform(y_GOOGL)
+
+train_XSCALE_GOOGL,test_XSCALE_GOOGL,train_ySCALE_GOOGL,test_ySCALE_GOOGL = train_test_split(XSCALE_GOOGL,ySCALE_GOOGL,test_size=0.20,train_size=0.80)
+
+artificialneuralnetwork_sym_GOOGL = Sequential()
+artificialneuralnetwork_sym_GOOGL.add(Dense(4,input_shape=(249,4),activation='relu'))
+artificialneuralnetwork_sym_GOOGL.add(Dense(4,activation='relu'))
+artificialneuralnetwork_sym_GOOGL.add(Dense(1,activation='linear'))
+
+artificialneuralnetwork_sym_GOOGL.compile(loss='mse',optimizer='rmsprop',metrics=['mse'])
+artificialneuralnetwork_sym_GOOGL.fit(train_XSCALE_GOOGL,train_ySCALE_GOOGL,epochs=228,batch_size=1)
+
+loss,meansquarederror = artificialneuralnetwork_sym_GOOGL.evaluate(test_XSCALE_GOOGL,test_ySCALE_GOOGL)
+print("Kayıp Fonksiyonu değeri(loss) ve Ortalama Kare Hata metriği(meansquarederror) değeri :\n", loss,meansquarederror)
+
+
+# WHEN OUR XtoPredict CONSISTS OF ONLY ONE SAMPLE:
+XtoPredict_GOOGL = np.array([[1024029,2091,2094,2068.86]])
+
+for i in XtoPredict_GOOGL[0]:
+    if i == 0:
+       XtoPredict_GOOGL[0,i] = XtoPredict_GOOGL[0,i].astype('float')
+    break
+print(XtoPredict_GOOGL)
+
+
+"""
+# WHEN OUR XtoPredict CONSISTS OF MORE THAN ONE SAMPLES:
+XtoPredict_GOOGL = np.array([[12828570,271.89,273.58,268.49],[9097597,270.52,271.18,268.34]])
+for i in XtoPredict_GOOGL[:]:
+    for j in i:
+       while j == 0:
+            XtoPredict_GOOGL[i,j] = XtoPredict_GOOGL[i,j].astype('float')
+
+"""
+
+#print(XtoPredict_GOOGL)
+
+XtoPredict_GOOGL = scaler_X_GOOGL.transform(XtoPredict_GOOGL)
+y_Predicted_GOOGL = artificialneuralnetwork_sym_GOOGL.predict(XtoPredict_GOOGL)
+y_Predicted_GOOGL = scaler_y_GOOGL.inverse_transform(y_Predicted_GOOGL)
+XtoPredict_GOOGL = scaler_X_GOOGL.inverse_transform(XtoPredict_GOOGL)
+print("XtoPredict_GOOGL= %s,y_Predicted_GOOGL=%s" % (XtoPredict_GOOGL[0],y_Predicted_GOOGL[0]))
